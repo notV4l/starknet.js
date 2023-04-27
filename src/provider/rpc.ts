@@ -20,11 +20,12 @@ import {
   TransactionStatus,
   waitForTransactionOptions,
 } from '../types';
+import { CallData } from '../utils/calldata';
 import fetch from '../utils/fetchPonyfill';
 import { getSelectorFromName } from '../utils/hash';
 import { stringify } from '../utils/json';
 import { BigNumberish, bigNumberishArrayToHexadecimalStringArray, toHex } from '../utils/num';
-import { parseCalldata, wait } from '../utils/provider';
+import { wait } from '../utils/provider';
 import { RPCResponseParser } from '../utils/responseParser/rpc';
 import { signatureToHexArray } from '../utils/stark';
 import { LibraryError } from './errors';
@@ -304,17 +305,15 @@ export class RpcProvider implements ProviderInterface {
   ): Promise<EstimateFeeResponse> {
     const block_id = new Block(blockIdentifier).identifier;
     return this.fetchEndpoint('starknet_estimateFee', {
-      request: [
-        {
-          type: RPC.TransactionType.INVOKE,
-          sender_address: invocation.contractAddress,
-          calldata: parseCalldata(invocation.calldata),
-          signature: signatureToHexArray(invocation.signature),
-          version: toHex(invocationDetails?.version || 0),
-          nonce: toHex(invocationDetails.nonce),
-          max_fee: toHex(invocationDetails?.maxFee || 0),
-        },
-      ],
+      request: {
+        type: RPC.TransactionType.INVOKE,
+        sender_address: invocation.contractAddress,
+        calldata: CallData.toHex(invocation.calldata),
+        signature: signatureToHexArray(invocation.signature),
+        version: toHex(invocationDetails?.version || 0),
+        nonce: toHex(invocationDetails.nonce),
+        max_fee: toHex(invocationDetails?.maxFee || 0),
+      },
       block_id,
     }).then(this.responseParser.parseFeeEstimateResponse);
   }
@@ -431,7 +430,7 @@ export class RpcProvider implements ProviderInterface {
     return this.fetchEndpoint('starknet_addInvokeTransaction', {
       invoke_transaction: {
         sender_address: functionInvocation.contractAddress,
-        calldata: parseCalldata(functionInvocation.calldata),
+        calldata: CallData.toHex(functionInvocation.calldata),
         type: RPC.TransactionType.INVOKE,
         max_fee: toHex(details.maxFee || 0),
         version: '0x1',
@@ -451,7 +450,7 @@ export class RpcProvider implements ProviderInterface {
       request: {
         contract_address: call.contractAddress,
         entry_point_selector: getSelectorFromName(call.entrypoint),
-        calldata: parseCalldata(call.calldata),
+        calldata: CallData.toHex(call.calldata),
       },
       block_id,
     });
