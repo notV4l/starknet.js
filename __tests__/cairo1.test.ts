@@ -1,6 +1,7 @@
 import { CallData, Contract, SequencerProvider } from '../src';
 import { tuple } from '../src/utils/calldata/cairo';
 import { toBigInt } from '../src/utils/num';
+import { decodeShortString } from '../src/utils/shortString';
 import {
   compiledHelloSierra,
   compiledHelloSierraCasm,
@@ -30,6 +31,7 @@ describeIfDevnetSequencer('Cairo 1 Devnet', () => {
       });
       classHash = declareV2Tx.class_hash;
       await provider.waitForTransaction(declareV2Tx.transaction_hash);
+
       const { transaction_hash, contract_address } = await account.deploy({ classHash });
       [contractAddress] = contract_address;
       await provider.waitForTransaction(transaction_hash);
@@ -111,8 +113,11 @@ describeIfDevnetSequencer('Cairo 1 Devnet', () => {
       expect(result).toBe(256n);
       result = await cairo1Contract.test_u128(255n);
       expect(result).toBe(256n);
-      result = await cairo1Contract.test_u256(255n);
-      expect(result).toBe(256n);
+    });
+
+    test('Cairo 1 - uint256', async () => {
+      const result = await cairo1Contract.test_u256(2n ** 256n - 2n);
+      expect(result).toBe(2n ** 256n - 1n);
     });
 
     test('Cairo 1 Contract Interaction - bool', async () => {
@@ -151,18 +156,52 @@ describeIfDevnetSequencer('Cairo 1 Devnet', () => {
       expect(Object.values(status)).toEqual([77n, 123n]);
     });
 
-    test('Cairo 1 Contract Interaction - echo flat un-nested Array', async () => {
-      // TODO: complete array
+    test('Cairo 1 Contract Interaction - echo flat un-nested Array u8, uint256, bool', async () => {
       const status = await cairo1Contract.echo_array([123, 55, 77, 255]);
       expect(status).toEqual([123n, 55n, 77n, 255n]);
+
+      const status1 = await cairo1Contract.echo_array_u256([123, 55, 77, 255]);
+      expect(status1).toEqual([123n, 55n, 77n, 255n]);
+
+      const status2 = await cairo1Contract.echo_array_bool([true, true, false, false]);
+      expect(status2).toEqual([true, true, false, false]);
     });
 
-    xtest('Cairo 1 Contract Interaction - echo flat un-nested Struct', async () => {
-      // TODO: Do Structure
+    test('Cairo 1 Contract Interaction - echo flat un-nested Struct', async () => {
       const status = await cairo1Contract.echo_struct({
         val: 'simple',
       });
-      expect(status).toBe('simple');
+      expect(decodeShortString(status.val)).toBe('simple');
+    });
+
+    test('Cairo 1 more complex structs', async () => {
+      const tx = await cairo1Contract.set_bet();
+      await account.waitForTransaction(tx.transaction_hash);
+      const status = await cairo1Contract.get_bet(1, {
+        formatResponse: { name: 'string', description: 'string' },
+      });
+
+      const expected = {
+        name: 'test',
+        description: 'dec',
+        expire_date: 1n,
+        creation_time: 1n,
+        creator: 3562055384976875123115280411327378123839557441680670463096306030682092229914n,
+        is_cancelled: false,
+        is_voted: false,
+        bettor: {
+          address: 3562055384976875123115280411327378123839557441680670463096306030682092229914n,
+          is_claimed: false,
+        },
+        counter_bettor: {
+          address: 3562055384976875123115280411327378123839557441680670463096306030682092229914n,
+          is_claimed: false,
+        },
+        winner: false,
+        pool: 10n,
+        amount: 1000n,
+      };
+      expect(expected).toEqual(status);
     });
   });
 });
